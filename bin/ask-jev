@@ -23,6 +23,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 AUTH_JSON = os.path.expanduser("~/.local/share/opencode/auth.json")
 
@@ -146,23 +147,24 @@ def main():
     elif cmd == "relevant":
         need(sys.argv, 4)
         q = sys.argv[2]
-        out = []
-        for f in sys.argv[3:]:
+        def score(f):
             text = sys.stdin.read() if f == "-" else open(f).read()
             # filename in state: a doc named flight.txt is itself a signal
             state = f"file: {os.path.basename(f)}\n\n" + text[:4000]
             r = predict(state, {"relevant": {"type": "noul",
                         "instructions": f"Does this text contain information that helps answer: {q}?"}})
-            out.append({"file": f, "relevant": answers(r)["relevant"]})
-        print(json.dumps(out))
+            return {"file": f, "relevant": answers(r)["relevant"]}
+        # remote latency ~300ms/call — parallel over files, keep arg order
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            print(json.dumps(list(ex.map(score, sys.argv[3:]))))
     elif cmd == "triage":
         need(sys.argv, 3)
-        out = []
-        for f in sys.argv[2:]:
+        def kind(f):
             state = f"file: {os.path.basename(f)}\n\n" + open(f).read()[:4000]
             r = predict(state, TRIAGE_Q)
-            out.append({"file": f, "kind": answers(r)["kind"]})
-        print(json.dumps(out))
+            return {"file": f, "kind": answers(r)["kind"]}
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            print(json.dumps(list(ex.map(kind, sys.argv[2:]))))
     elif cmd == "yesno":
         need(sys.argv, 4)
         r = predict(sys.argv[2], {"answer": {"type": "noul", "instructions": sys.argv[3]}})
