@@ -39,19 +39,41 @@ opencode `auth.json` → `AI_GATEWAY_API_KEY`/`VERCEL_OIDC_TOKEN` →
 `CLOUDFLARE_ACCOUNT_ID`+`CLOUDFLARE_API_TOKEN`. `JEV_MODEL` overrides the
 model id.
 
+## MCP server
+
+`jev-mcp.py` exposes the same tool surface as `local-laya/laya-mcp.py` —
+`jev_route`, `jev_filter`, `jev_triage`, `jev_yesno`, `jev_pick`,
+`jev_decide`, `jev_status` — over stdio, for agents that take MCP servers
+(needs the `mcp` package). File scoring is parallel across the provider
+(jev has no batch endpoint). Register like any MCP server, e.g. opencode:
+
+```json
+{"mcp": {"jev": {"type": "local",
+  "command": ["python3", "/path/to/jev-mcp.py"], "enabled": true}}}
+```
+
+`laya-gate.py` (local-laya ≥ `873e0a7`) and the ask-laya opencode plugin
+already credit `jev_*` MCP calls and `ask-jev` shell commands — jev is a
+drop-in decision layer wherever laya enforcement is installed.
+
 ## Where it fits
 
 - **Agent skill**: `SKILL.md` mirrors ask-laya's rule — every
   classify/route/filter/score/yes-no decision goes through `ask-jev`. Point
   any agent's skill loader at it, or drop an `AGENTS.md` with the rule into
-  the workspace.
+  the workspace (see `smoke/AGENTS.md`).
 - **Not a subagent**: Jev returns structured values, not text — it can't be
   an opencode subagent/model. The right wiring is a tool the *existing* agent
-  calls (this CLI, or an MCP wrapper), same pattern as laya.
+  calls (this CLI or the MCP server), same pattern as laya.
 - **vs local laya**: jev is more accurate and needs no GPU slot; laya is
-  ~20 ms and works offline. They speak the same question schema, so a gate
-  like `local-laya/laya-gate.py` could fall back to jev when the daemon is
-  down (not yet implemented).
+  ~20 ms and works offline. Same question schema — pick per environment, or
+  let both be registered and steer via AGENTS.md.
 
-Verified live on `jev-1.13-free` via OpenCode Zen: doc relevance gave 0.97 vs
-~0.01 separation, and triage classified all 5 fixture docs correctly.
+## Tested
+
+`smoke/` — the same 6-test suite as ask-laya, run against opencode +
+gpt-6-luna with laya's MCP disabled (jev-only): **6/6 correct, every test
+routed through jev** (`jev_jev_*` MCP tools + `ask-jev` CLI), doc gate
+opened by both paths. Direct CLI checks on `jev-1.13-free`: doc relevance
+0.97 vs ~0.01 separation, triage correct on all 5 fixtures. Reproduce:
+`cd smoke && ./run.sh`.
