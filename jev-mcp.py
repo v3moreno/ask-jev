@@ -1,14 +1,8 @@
 """jev-mcp — stdio MCP server exposing Jev's typed decisions as tools.
 
-Agents spawn this once and get jev_* tools; calls go straight to whichever
-remote provider is configured — no local model, no daemon. Mirrors the
-laya-mcp.py surface.
-
-    python jev-mcp.py            # needs `mcp` package on the interpreter
-
-Providers (first configured wins): JEV_URL+JEV_API_KEY, TYPESAFE_API_KEY,
-OPENCODE_API_KEY or opencode auth.json, AI_GATEWAY_API_KEY/VERCEL_OIDC_TOKEN,
-CLOUDFLARE_ACCOUNT_ID+CLOUDFLARE_API_TOKEN. JEV_MODEL overrides the model id.
+Agents spawn this and get jev_* tools proxied to the configured remote
+provider — no local model, no daemon. Same surface as laya-mcp.py.
+Requires the `mcp` package; provider env vars as in bin/ask-jev.
 """
 
 import glob as _glob
